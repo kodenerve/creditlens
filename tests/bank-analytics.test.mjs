@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import {paymentChannel,channelSummary,balanceAnalytics,bankDate} from '../dist/bank-analytics.js';
+for(let c of ['NEFT','IMPS','ACH','NACH','ECS','RTGS'])assert.equal(paymentChannel(c+'/CR/SAMPLE123'),c);
+assert.equal(paymentChannel('NACHDR-ACME'),'NACH');assert.equal(paymentChannel('ACHDR SAMPLE'),'ACH');assert.equal(paymentChannel('NEFT12345678'),'NEFT');assert.equal(paymentChannel('NACH PAYMENT'),'NACH');assert.equal(paymentChannel('ATTACHMENT'),'Other');assert.equal(paymentChannel('NEFT / RTGS TRANSFER'),'Other');
+let groups=channelSummary([{description:'NACH',debit:100,credit:0},{description:'ACH',debit:20,credit:0},{description:'NACH',debit:400,credit:0,review:true},{description:'NEFT',debit:0,credit:1000}]);assert.equal(groups.find(g=>g.channel==='NACH').debit,100);assert.equal(groups.find(g=>g.channel==='NACH').count,2);assert.equal(groups.find(g=>g.channel==='NACH').review,1);assert.equal(groups.find(g=>g.channel==='ACH').debit,20);assert.equal(groups.reduce((s,g)=>s+g.count,0),4);
+let rows=[{date:'01/10/2026',balance:10000},{date:'01/10/2026',balance:8000},{date:'03/10/2026',balance:14000},{date:'05/10/2026',balance:12000}];let b=balanceAnalytics(rows);assert.equal(b.average,11200);assert.equal(b.days,5);assert.deepEqual(b.daily.map(d=>d.balance),[8000,8000,14000,14000,12000]);assert.equal(b.observedAverage,11000);assert.equal(b.monthly[0].average,11200);
+let rev=balanceAnalytics([...rows].reverse());assert.equal(rev.average,11200,'descending source rows respect same-day transaction order');
+let missing=balanceAnalytics([{date:'01/10/2026',balance:100},{date:'03/10/2026',balance:null},{date:'05/10/2026',balance:200}]);assert.equal(missing.average,null);assert.equal(missing.missing,2);assert.equal(missing.monthly[0].average,null);
+let pending=balanceAnalytics([{date:'01/10/2026',balance:100},{date:'01/10/2026',balance:500,review:true}]);assert.equal(pending.average,null);
+let leap=balanceAnalytics([{date:'28/02/2024',balance:100},{date:'01/03/2024',balance:400}]);assert.equal(leap.days,3);assert.equal(leap.average,200);assert.equal(leap.monthly.length,2);
+let period=balanceAnalytics(rows,{start:'2026-10-02',end:'2026-10-04'});assert.equal(period.average,12000);assert.equal(period.observedAverage,14000);
+let opening=balanceAnalytics([{date:'03/10/2026',balance:300}],{start:'2026-10-01',end:'2026-10-03',opening:100});assert.equal(opening.average,500/3);
+assert.equal(bankDate('31/02/2026'),null);assert.equal(bankDate('01-Oct-26'),Date.UTC(2026,9,1));assert.equal(balanceAnalytics([{date:'invalid',balance:100},...rows]).average,null);assert.equal(balanceAnalytics(rows,{start:'2026-10-05',end:'2026-10-01'}).error,'Enter a valid period with the end on or after the start.');
+let negative=balanceAnalytics([{date:'01/10/2026',balance:-100},{date:'02/10/2026',balance:0}]);assert.equal(negative.average,-50);
+console.log('PASS channel separation, no double counting, pending exclusion, weighted daily averages, last same-day balance, reverse order, missing coverage, leap day, monthly breakdown, selected periods and overdrafts');

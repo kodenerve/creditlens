@@ -1,0 +1,14 @@
+{
+  "name": "creditlens",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node server.mjs",
+    "test": "node tests/bank.test.mjs && node tests/bank-analytics.test.mjs && node tests/loan.test.mjs"
+  }
+}
